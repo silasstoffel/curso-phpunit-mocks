@@ -12,55 +12,37 @@ class EncerradorTest extends TestCase
 {
     public function testDeveEncerrarLeiloesComMaisDeUmaSemana()
     {
-        $leilaoFiat = new Leilao('Fiat 147 0Km', new \DateTimeImmutable('8 days ago'));
-        $leilaoVariante = new Leilao('Variante 0Km', new \DateTimeImmutable('10 days ago'));
+        $fiat147 = new Leilao('Fiat 147 0Km', new \DateTimeImmutable('8 days ago'));
+        $variant = new Leilao('Variante 0Km', new \DateTimeImmutable('10 days ago'));
 
-        $leilaoDao = new LeilaoDaoMock();
-        $leilaoDao->salva($leilaoFiat);
-        $leilaoDao->salva($leilaoVariante);
+        $leilaoDao = $this->createMock(LeilaoDao::class);
+        $leilaoDao->method('recuperarNaoFinalizados')
+        ->willReturn([$fiat147,$variant]);
+
+        $leilaoDao->method('recuperarFinalizados')
+        ->willReturn([$fiat147,$variant]);
+
+        $leilaoDao->expects(
+            $this->exactly(2)
+        )
+        ->method('atualiza')
+        ->withConsecutive(
+            [$fiat147],
+            [$variant]
+        );
 
         $encerrador = new Encerrador($leilaoDao);
         $encerrador->encerra();
 
-        $leiloesEncerrados = $leilaoDao->recuperarFinalizados();
-        static::assertCount(2, $leiloesEncerrados);
+        $leiloes = [$fiat147, $variant];
+        static::assertCount(2, $leiloes);
         static::assertEquals(
             'Fiat 147 0Km',
-            $leiloesEncerrados[0]->recuperarDescricao()
+            $leiloes[0]->recuperarDescricao()
         );
         static::assertEquals(
             'Variante 0Km',
-            $leiloesEncerrados[1]->recuperarDescricao()
+            $leiloes[1]->recuperarDescricao()
         );
-    }
-}
-
-
-class LeilaoDaoMock extends LeilaoDao
-{
-    private $leiloes = [];
-
-    public function salva(Leilao $leilao): void
-    {
-        $this->leiloes[] = $leilao;
-    }
-
-    public function recuperarFinalizados(): array
-    {
-        return array_filter($this->leiloes, function (Leilao $leilao) {
-            return $leilao->estaFinalizado();
-        });
-    }
-
-    public function recuperarNaoFinalizados(): array
-    {
-        return array_filter($this->leiloes, function (Leilao $leilao) {
-            return !$leilao->estaFinalizado();
-        });
-    }
-
-    public function atualiza(Leilao $leilao)
-    {
-        return;
     }
 }
